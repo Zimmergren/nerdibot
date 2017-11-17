@@ -1,12 +1,12 @@
 using System;
-using System.Net;
 using System.Threading.Tasks;
-
 using Microsoft.Bot.Connector;
 using Microsoft.Bot.Builder.Dialogs;
 using System.Net.Http;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Microsoft.Bot.Sample.SimpleEchoBot
 {
@@ -20,6 +20,25 @@ namespace Microsoft.Bot.Sample.SimpleEchoBot
 
         public async Task MessageReceivedAsync(IDialogContext context, IAwaitable<IMessageActivity> argument)
         {
+            #region Is Typing Activity
+
+            var activity = context.Activity as Activity;
+            Trace.TraceInformation($"Type={activity.Type} Text={activity.Text}");
+            if (activity.Type == ActivityTypes.Message)
+            {
+                var connector = new ConnectorClient(new System.Uri(activity.ServiceUrl));
+                var isTyping = activity.CreateReply("Nerdibot is thinking...");
+                isTyping.Type = ActivityTypes.Typing;
+                await connector.Conversations.ReplyToActivityAsync(isTyping);
+
+                // DEMO: I've added this for demonstration purposes, so we have time to see the "Is Typing" integration in the UI. Else the bot is too quick for us :)
+                Thread.Sleep(2500);
+            }
+
+            #endregion
+
+            #region Handle incoming message
+
             var message = await argument;
 
             HttpClient client = new HttpClient();
@@ -28,17 +47,23 @@ namespace Microsoft.Bot.Sample.SimpleEchoBot
             var deserializedChuck = JsonConvert.DeserializeObject<dynamic>(chuckJoke);
             string chuckSays = ((dynamic) deserializedChuck).value.ToString();
             
-            await context.PostAsync(GetRandomGreet() + Environment.NewLine + chuckSays);
+            await context.PostAsync(GetRandomGreet(activity.From.Name) + Environment.NewLine + chuckSays);
+
+            #endregion
+
             context.Wait(MessageReceivedAsync);
         }
 
-        private string GetRandomGreet()
+        private string GetRandomGreet(string name)
         {
             List<string> greetings = new List<string>
             {
-                "Captain, I'm sorry but I don't understand. I will tell you a joke instead: ",
-                "Wait, what? Nevermind, Chuck wants to relay this info: ",
-                "I don't know what you're on about, but here's an entirely different topic to think about: "
+                $"Hey there {name}!",
+                $"Okay {name}.",
+                $"{name}, your request has been considered, and I approve. This time.",
+                $"Okidoki {name}.",
+                $"What's up my awesome pal, {name}."
+
             };
             Random r = new Random();
             int index = r.Next(greetings.Count);
@@ -47,6 +72,5 @@ namespace Microsoft.Bot.Sample.SimpleEchoBot
             return randomString;
 
         }
-
     }
 }
